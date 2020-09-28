@@ -1,4 +1,4 @@
-#ifndef PROTO_H__
+#ifndef PROTO_H__macro
 #define PROTO_H__
 
 #include "site_type.h"
@@ -14,10 +14,10 @@
 #define MINCHNID 1
 #define MAXCHNID (MINCHNID + CHNNR - 1)
 
-#define MSG_CHANNEL_MAX (512 - 20 - 8)
+#define MSG_CHANNEL_MAX (65536 - 20 - 8)
 #define MAX_DATA (MSG_CHANNEL_MAX - sizeof(chnid_t))
 
-#define MSG_LIST_MAX (512 - 20 - 8)
+#define MSG_LIST_MAX (65536 - 20 - 8)
 #define MAX_ENTRY (MSG_LIST_MAX - sizeof(chnid_t))
 
 struct msg_channel_st {
@@ -27,6 +27,7 @@ struct msg_channel_st {
 
 struct msg_listentry_st {
     chnid_t chnid;
+    uint8_t len;
     uint8_t describe[1];
 } __attribute__((packed));
 
