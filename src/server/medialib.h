@@ -4,6 +4,9 @@
 #include "../include/proto.h"
 #include <sys/types.h>
 
+#define PATHSIZE 1024
+#define BITRATE (16 * 1024)
+
 struct mlib_listentry_st {
     chnid_t chnid;
     char* desc;

@@ -11,9 +11,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define PATHSIZE 1024
-#define BITRATE (16 * 1024)
-
 struct channel_context_st {
     chnid_t chnid;
     char* desc;
