@@ -1,13 +1,11 @@
 #include "mytbf.h"
 #include <errno.h>
-#include <error.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <unistd.h>
 
 struct mytbf_st {
     int cps;

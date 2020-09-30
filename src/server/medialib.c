@@ -1,12 +1,10 @@
 #include "medialib.h"
 #include "mytbf.h"
 #include "server_conf.h"
-#include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
 #include <sys/syslog.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -29,8 +27,8 @@ static int path2entry(char* path, int* num, struct mlib_listentry_st* ptr)
     int i;
     FILE* fp;
     int chnid = -1;
-    char* line;
-    size_t linesize;
+    char* line = NULL;
+    size_t linesize = 0;
 
     snprintf(descpath, PATHSIZE, "%s/*.txt", path);
     // 对每个频道目录解析 掠过无效 保存到channel中
@@ -44,21 +42,39 @@ static int path2entry(char* path, int* num, struct mlib_listentry_st* ptr)
         return 0;
     }
 
+    syslog(LOG_DEBUG, "%s", descglob.gl_pathv[0]);
+    syslog(LOG_DEBUG, "%s", mp3glob.gl_pathv[0]);
+
     // 解析描述文件
     fp = fopen(descglob.gl_pathv[0], "r");
+    if (fp == NULL) {
+        syslog(LOG_ERR, "fopen");
+        return -1;
+    }
+
     if (getline(&line, &linesize, fp) < 0) {
         syslog(LOG_ERR, "getline ch num");
         return -1;
     }
     chnid = atoi(line);
+
+    syslog(LOG_DEBUG, "chnid = %d, desc = %s", chnid, line);
+    
     if (chnid < 1 || chnid > MAXCHNID) {
-        syslog(LOG_ERR, "chnid error");
+        syslog(LOG_ERR, "get chnid");
         return -1;
     }
+
+    syslog(LOG_DEBUG, "chnid = %d, desc = %s", chnid, line);
+
     channel[chnid].chnid = chnid;
     if (getline(&line, &linesize, fp) < 0) {
+        syslog(LOG_ERR, "get desc");
         return -1;
     }
+
+    syslog(LOG_DEBUG, "chnid = %d, desc = %s", chnid, line);
+
     channel[chnid].desc = line;
     // 16Kb = 16*8Kbit = 128Kbit
     channel[chnid].mytbf = mytbf_init(BITRATE, BITRATE * 5);
@@ -68,6 +84,7 @@ static int path2entry(char* path, int* num, struct mlib_listentry_st* ptr)
     ptr[*num].chnid = chnid;
     ptr[*num].desc = line;
     (*num)++;
+
 
     return 0;
 }
@@ -88,6 +105,7 @@ int mlib_getchnlist(struct mlib_listentry_st** list, int* list_size)
     snprintf(path, PATHSIZE, "%s/*", server_conf.media_dir);
 
     if (glob(path, 0, NULL, &globres)) {
+        syslog(LOG_DEBUG, "%s", path);
         return -1;
     }
 
@@ -98,6 +116,7 @@ int mlib_getchnlist(struct mlib_listentry_st** list, int* list_size)
     }
 
     for (i = 0; i < globres.gl_pathc; i++) {
+        syslog(LOG_DEBUG, "%s", globres.gl_pathv[i]);
         if (path2entry(globres.gl_pathv[i], &num, ptr) < 0) {
             exit(1);
         }

@@ -1,26 +1,20 @@
 #include "medialib.h"
-#include "mytbf.h"
 #include "server_conf.h"
 #include "thr_channel.h"
 #include "thr_list.h"
 #include <arpa/inet.h>
 #include <bits/getopt_core.h>
-#include <bits/types/sigset_t.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <getopt.h>
 #include <net/if.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/syslog.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 
 struct server_conf_st server_conf = {

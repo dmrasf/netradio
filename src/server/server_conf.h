@@ -3,7 +3,7 @@
 
 #include <netinet/in.h>
 
-#define DEFAULT_MEDIADIR "/var/medir"
+#define DEFAULT_MEDIADIR "/var/media"
 #define DEFAULT_IF "wlp3s0"
 
 enum {
