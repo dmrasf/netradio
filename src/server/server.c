@@ -33,12 +33,17 @@ struct server_conf_st server_conf = {
 
 int sd;
 struct sockaddr_in snaddr;
+static struct mlib_listentry_st* list;
 
 static void print_help();
 static void get_op(int argc, char* argv[]);
 static int daemonize();
 static void daemon_exit(int s)
 {
+    thr_channel_destroyall();
+    thr_list_destroy();
+    mlib_freechnlist(list);
+
     closelog();
     exit(0);
 }
@@ -98,7 +103,6 @@ int main(int argc, char* argv[])
     // 套接字初始化
     socket_init();
 
-    struct mlib_listentry_st* list;
     int list_size;
     int i;
 

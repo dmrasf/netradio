@@ -128,6 +128,7 @@ ssize_t mild_readchn(chnid_t chnid, void* ptr, size_t n)
         } else if (nread == 0) {
             // 若读完一个文件，则打开下一个文件继续
             close(channel[chnid].fd);
+            syslog(LOG_DEBUG, "finish");
             channel[chnid].pos = (channel[chnid].pos + 1) % channel[chnid].mp3glob.gl_pathc;
             channel[chnid].fd = open(channel[chnid].mp3glob.gl_pathv[channel[chnid].pos], O_RDONLY);
             break; /* EOF */
