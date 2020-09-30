@@ -3,7 +3,7 @@
 
 #include "site_type.h"
 
-#define DEFAULT_IP "224.1.1.2"
+#define DEFAULT_IP "224.0.1.1"
 #define DEFAULT_PORT "3333"
 
 // channel num
@@ -14,7 +14,10 @@
 #define MINCHNID 1
 #define MAXCHNID (MINCHNID + CHNNR - 1)
 
+// 包实际大小 = 包大小 - IP数据报首部(20) - UDP数据报首部(8)
+// 用来申请内存
 #define MSG_CHANNEL_MAX (65536 - 20 - 8)
+// 数据大小 = 包实际大小 - 频道号
 #define MAX_DATA (MSG_CHANNEL_MAX - sizeof(chnid_t))
 
 #define MSG_LIST_MAX (65536 - 20 - 8)

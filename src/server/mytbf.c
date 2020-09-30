@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 struct mytbf_st {
     int cps;
@@ -34,10 +35,6 @@ static int find_free_pos_unlocked(void)
 
 static void* alrm_handler(void* ptr)
 {
-    struct timespec rq;
-    rq.tv_sec = 0;
-    rq.tv_nsec = 10000000;
-
     while (1) {
         pthread_mutex_lock(&mut_job);
         for (int i = 0; i < MYTBF_MAX; i++) {
@@ -51,7 +48,7 @@ static void* alrm_handler(void* ptr)
             }
         }
         pthread_mutex_unlock(&mut_job);
-        nanosleep(&rq, NULL);
+        sleep(1);
     }
 }
 
