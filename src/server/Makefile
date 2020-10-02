@@ -1,11 +1,17 @@
-CFLAGS+=-I../include -pthread
-LDFLAGS+=-pthread
-CC=gcc
+CFLAGS += -I../include -pthread
+LDFLAGS += -pthread
+CC = gcc
+TARGET = server
+SRCS := $(wildcard *.c)
+OBJS := $(SRCS:.c=.o)
+RM = rm -rf
 
-all:server
+all: clean build
 
-server:server.o thr_channel.o thr_list.o mytbf.o medialib.o
-	$(CC) $^ -o $@ $(CFLAGS) $(LDFLAGS)
+build:
+	$(CC) $(SRCS) -c $(CFLAGS) $(LDFLAGS)
+	$(CC) $(OBJS) $(CFLAGS) $(LDFLAGS) -o $(TARGET)
+	$(RM) $(OBJS)
 
 clean:
-	rm *.o server -rf
+	$(RM) $(OBJS) $(TARGET)

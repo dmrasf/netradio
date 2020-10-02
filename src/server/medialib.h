@@ -1,7 +1,7 @@
 #ifndef MEDIA_H__
 #define MEDIA_H__
 
-#include "../include/proto.h"
+#include <proto.h>
 #include <sys/types.h>
 
 #define PATHSIZE 1024
