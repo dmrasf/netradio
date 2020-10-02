@@ -1,9 +1,19 @@
-CC=gcc
+CFLAGS += -I../include -pthread
+LDFLAGS += -pthread
+CC = gcc
+TARGET = client
+SRCS := $(wildcard *.c)
+OBJS := $(SRCS:.c=.o)
+RM = rm -rf
 
-all:client
+all: clean build
 
-client: client.o
-	$(CC) $^ -o $@
+build: $(OBJS)
+	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $(TARGET)
+	$(RM) $^
+
+%.o: %.c
+	$(CC) $^ -c $(CFLAGS) $(LDFLAGS)
 
 clean:
-	rm *.o client
+	$(RM) $(OBJS) $(TARGET)

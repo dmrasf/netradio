@@ -8,10 +8,12 @@ RM = rm -rf
 
 all: clean build
 
-build:
-	$(CC) $(SRCS) -c $(CFLAGS) $(LDFLAGS)
-	$(CC) $(OBJS) $(CFLAGS) $(LDFLAGS) -o $(TARGET)
-	$(RM) $(OBJS)
+build: $(OBJS)
+	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $(TARGET)
+	$(RM) $^
+
+%.o: %.c
+	$(CC) $^ -c $(CFLAGS) $(LDFLAGS)
 
 clean:
 	$(RM) $(OBJS) $(TARGET)
