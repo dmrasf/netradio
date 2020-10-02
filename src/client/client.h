@@ -1,7 +1,7 @@
 #ifndef CLIENT_H__
 #define CLIENT_H__
 
-#include "../include/proto.h"
+#include <proto.h>
 
 #define PLAYER_CMD "(/usr/bin/mpg123 - > /dev/null 2>&1)"
 

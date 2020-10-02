@@ -22,7 +22,8 @@ static struct mlib_listentry_st* list_ent;
 
 static void* thr_list(void* ptr)
 {
-    int totalsize, size;
+    int totalsize;
+    uint8_t size;
     struct msg_listentry_st* msg_listentry;
     struct msg_list_st* msg_list;
     int i;
@@ -45,7 +46,7 @@ static void* thr_list(void* ptr)
     for (i = 0; i < nr_list_ent; i++) {
         size = sizeof(struct msg_listentry_st) + strlen(list_ent[i].desc);
         msg_listentry->chnid = list_ent[i].chnid;
-        msg_listentry->len = htons(size);
+        msg_listentry->len = size;
         strcpy((char*)msg_listentry->describe, list_ent[i].desc);
         // 转到下一条记录地址
         msg_listentry = (void*)((char*)msg_listentry + size);

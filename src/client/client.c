@@ -1,6 +1,5 @@
 #include "client.h"
 #include <arpa/inet.h>
-#include <asm-generic/errno-base.h>
 #include <errno.h>
 #include <getopt.h>
 #include <ifaddrs.h>
@@ -9,7 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/syslog.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -23,6 +24,8 @@ static void get_cmd(int argc, char** argv);
 static void printf_help();
 static int get_ifname(char**);
 static ssize_t writen(int fd, const void* buf, size_t n);
+static void send_to_mpg123(int sd, int* pd);
+static void revc_from_socket(int sd, int* pd);
 
 // cmd > env > conf > default
 int main(int argc, char** argv)
@@ -30,12 +33,10 @@ int main(int argc, char** argv)
     int sd;
     int val;
     struct ip_mreqn mreqn;
-    struct sockaddr_in laddr, serveraddr, raddr;
-    socklen_t raddr_len, serveraddr_len;
+    struct sockaddr_in laddr;
     int pd[2];
     int pid;
-    int len;
-    int chosenid;
+    int i = 0, j;
 
     // 获取命令行参数
     get_cmd(argc, argv);
@@ -46,15 +47,16 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    // 多播组应和服务端多播组一致
     if (inet_pton(AF_INET, client_conf.mgroup, &mreqn.imr_multiaddr) <= 0) {
         perror("inet_pton()");
         exit(1);
     }
+    // 本地地址
     if (inet_pton(AF_INET, "0.0.0.0", &mreqn.imr_address) <= 0) {
         perror("inet_pton()");
         exit(1);
     }
-
     char* ifname = NULL;
     if (get_ifname(&ifname) < 0) {
         perror("get_ifname");
@@ -62,13 +64,8 @@ int main(int argc, char** argv)
     }
     mreqn.imr_ifindex = if_nametoindex(ifname);
 
+    // 加入多播组
     if (setsockopt(sd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*)&mreqn, sizeof(mreqn)) < 0) {
-        perror("setsockopt()");
-        exit(1);
-    }
-
-    val = 1;
-    if (setsockopt(sd, IPPROTO_IP, IP_MULTICAST_LOOP, &val, sizeof(val)) < 0) {
         perror("setsockopt()");
         exit(1);
     }
@@ -79,6 +76,7 @@ int main(int argc, char** argv)
         perror("inet_pton()");
         exit(1);
     }
+    // 绑定服务器设置的端口和本地地址
     if (bind(sd, (void*)&laddr, sizeof(laddr)) < 0) {
         perror("bind()");
         exit(1);
@@ -94,89 +92,11 @@ int main(int argc, char** argv)
         perror("fork()");
         exit(1);
         break;
-
     case 0:
-        close(sd);
-        close(pd[1]);
-        // 重定向到标准输入
-        dup2(pd[0], 0);
-        if (pd[0] > 0)
-            close(pd[0]);
-        execl("/bin/sh", "sh", "-c", client_conf.player_cmd, NULL);
-        perror("execl()");
-        exit(1);
+        send_to_mpg123(sd, pd);
         break;
-
     default:
-        close(pd[0]);
-
-        struct msg_list_st* msg_list;
-        msg_list = malloc(MSG_LIST_MAX);
-        if (msg_list == NULL) {
-            perror("malloc()");
-            exit(1);
-        }
-
-        while (1) {
-            len = recvfrom(sd, msg_list, MSG_LIST_MAX, 0,
-                (void*)&serveraddr_len, &serveraddr_len);
-            // 包过小
-            if (len < sizeof(struct msg_list_st)) {
-                fprintf(stderr, "msg unknow\n");
-                continue;
-            }
-            // 包不是节目单
-            if (msg_list->chnid != 0) {
-                fprintf(stderr, "msg not list\n");
-                continue;
-            }
-            break;
-        }
-        // 打印节目单
-        struct msg_listentry_st* pos;
-        for (pos = msg_list->entrys;
-             (char*)pos < (char*)msg_list + len;
-             pos = (void*)((char*)pos + ntohs(pos->len))) {
-            printf("channel %d: %s\n", pos->chnid, pos->describe);
-        }
-
-        while (1) {
-            if (scanf("%d", &chosenid) != 1)
-                exit(1);
-        }
-
-        struct msg_channel_st* msg_channel;
-        msg_channel = malloc(MSG_CHANNEL_MAX);
-        if (msg_channel == NULL) {
-            perror("malloc()");
-            exit(1);
-        }
-
-        while (1) {
-            len = recvfrom(sd, msg_channel, MSG_CHANNEL_MAX, 0,
-                (void*)&raddr, &raddr_len);
-            // 地址不同
-            if (raddr.sin_addr.s_addr != serveraddr.sin_addr.s_addr
-                || raddr.sin_port != serveraddr.sin_port) {
-                fprintf(stderr, "addr not same\n");
-                continue;
-            }
-            if (len < sizeof(struct msg_channel_st)) {
-                fprintf(stderr, "msg unknow\n");
-                continue;
-            }
-            if (msg_channel->chnid == chosenid) {
-                if (writen(pd[1], msg_channel->data, len - sizeof(chnid_t)) < 0) {
-                    perror("writen()");
-                    exit(1);
-                }
-            }
-        }
-
-        free(msg_list);
-        free(msg_channel);
-        close(sd);
-
+        revc_from_socket(sd, pd);
         break;
     }
 
@@ -270,4 +190,119 @@ static ssize_t writen(int fd, const void* buf, size_t n)
         pos += len;
     }
     return pos;
+}
+
+static void send_to_mpg123(int sd, int* pd)
+{
+    close(sd);
+    close(pd[1]);
+    // 重定向到标准输入
+    dup2(pd[0], 0);
+    if (pd[0] > 0)
+        close(pd[0]);
+    execl("/bin/sh", "sh", "-c", client_conf.player_cmd, NULL);
+    perror("execl()");
+    exit(1);
+}
+
+static void revc_from_socket(int sd, int* pd)
+{
+    struct sockaddr_in serveraddr, raddr;
+    socklen_t raddr_len, serveraddr_len;
+    int chnids[CHNNR];
+    int chosenid;
+    int len;
+    int i = 0, j = 0;
+
+    close(pd[0]);
+    struct msg_list_st* msg_list;
+    msg_list = malloc(MSG_LIST_MAX);
+    if (msg_list == NULL) {
+        perror("malloc()");
+        exit(1);
+    }
+
+    while (1) {
+        len = recvfrom(sd, msg_list, MSG_LIST_MAX, 0,
+            (void*)&serveraddr, &serveraddr_len);
+        if (len < sizeof(struct msg_list_st)) {
+            /*fprintf(stderr, "client.c => recvfrom()[list]: too small, skip\n");*/
+            continue;
+        }
+        if (msg_list->chnid != 0) {
+            /*fprintf(stderr, "client.c => recvfrom()[list]: not list, skip\n");*/
+            continue;
+        } else {
+            /*fprintf(stderr, "client.c => recvfrom()[list]: list, break\n");*/
+            break;
+        }
+    }
+
+    struct msg_listentry_st* entry_pos;
+    struct msg_channel_st* msg_channel;
+    chnid_t* id = mmap(0, sizeof(chnid_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (id == NULL) {
+        perror("mmap()");
+        exit(1);
+    }
+    *id = 1;
+
+    switch (fork()) {
+    case -1:
+        perror("fork()");
+        exit(1);
+        break;
+    case 0:
+        // 获取用户输入进程
+        while (1) {
+            for (entry_pos = msg_list->entrys; (char*)entry_pos < ((char*)msg_list + len);
+                 entry_pos = (struct msg_listentry_st*)((char*)entry_pos + entry_pos->len)) {
+                printf("channel %d: %s", entry_pos->chnid, entry_pos->describe);
+                chnids[i++] = entry_pos->chnid;
+            }
+            printf("\nInput Channel ID: ");
+            scanf("%d", &chosenid);
+            for (j = 0; j < i; j++) {
+                if (chosenid == chnids[j]) {
+                    *id = chosenid;
+                    break;
+                }
+            }
+            if (j == i)
+                printf("Input error!\n");
+        }
+        break;
+    default:
+        msg_channel = malloc(MSG_CHANNEL_MAX);
+        if (msg_channel == NULL) {
+            perror("malloc()");
+            exit(1);
+        }
+        while (1) {
+            len = recvfrom(sd, msg_channel, MSG_CHANNEL_MAX, 0,
+                (void*)&raddr, &raddr_len);
+            // 地址不同
+            /*if (raddr.sin_addr.s_addr != serveraddr.sin_addr.s_addr*/
+            /*|| raddr.sin_port != serveraddr.sin_port) {*/
+            /*fprintf(stderr, "client.c => recvfrom()[channel]: raddr != serveraddr\n");*/
+            /*continue;*/
+            /*}*/
+            if (len < sizeof(struct msg_channel_st)) {
+                fprintf(stderr, "client.c => recvfrom()[channel]: too small, skip\n");
+                continue;
+            }
+            if (msg_channel->chnid == *id) {
+                if (writen(pd[1], msg_channel->data, len - sizeof(chnid_t)) < 0) {
+                    perror("writen()");
+                    exit(1);
+                }
+            }
+        }
+        break;
+    }
+
+    munmap(id, sizeof(chnid_t));
+    free(msg_list);
+    free(msg_channel);
+    close(sd);
 }
